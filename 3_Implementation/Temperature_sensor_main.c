@@ -1,112 +1,75 @@
+#include <avr/io.h>
+#define F_CPU 1000000
+#include <util/delay.h>
+#include <stdlib.h>
 
-#include <Wire.h>  
-#include <LiquidCrystal_I2C.h>
+#define enable            5
+#define registerselection 6
 
-#include "DHT.h"
+void send_a_command(unsigned char command);
+void send_a_character(unsigned char character);
+void send_a_string(char *string_of_characters);
 
-#define DHTPIN 2     
+int main(void)
+{
+    DDRB = 0xFF;
+    DDRA = 0;
+    DDRD = 0xFF;
+    _delay_ms(50);
+    
+    ADMUX |=(1<<REFS0)|(1<<REFS1);
+    ADCSRA |=(1<<ADEN)|(1<<ADATE)|(1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2);
+    
+    int16_t COUNTA = 0;
+    char SHOWA [3];
+     
 
-#define DHTTYPE DHT11  
-
-DHT dht(DHTPIN, DHTTYPE);
-
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  
-void setup() {
-  Serial.begin(9600);
-  
-  lcd.begin(16,2);
-  dht.begin();
+    send_a_command(0x01); //Clear Screen 0x01 = 00000001
+    _delay_ms(50);
+    send_a_command(0x38);
+    _delay_ms(50);
+    send_a_command(0b00001111);
+    _delay_ms(50);
+    
+    ADCSRA |=(1<<ADSC);
+    while(1)
+    {
+        COUNTA = ADC/4;
+        send_a_string ("CIRCUIT DIGEST");
+        send_a_command(0x80 + 0x40 + 0);
+        send_a_string ("Temp(C)=");
+        send_a_command(0x80 + 0x40 + 8);
+        itoa(COUNTA,SHOWA,10);
+        send_a_string(SHOWA);
+        send_a_string ("      ");
+        send_a_command(0x80 + 0);
+        
+    }    
 }
 
-void loop() {
-  
-  int h = dht.readHumidity();
-  int t = dht.readTemperature();
-  
+void send_a_command(unsigned char command)
+{
+    PORTB = command;
+    PORTD &= ~ (1<<registerselection);
+    PORTD |= 1<<enable;
+    _delay_ms(20);
+    PORTD &= ~1<<enable;
+    PORTB = 0;
+}
 
-  int f = (t * 9.0)/ 5.0 + 32.0;
-
-    
-  lcd.setCursor(0, 0);
- 
-   
-  lcd.print("P1nesap IoT");
-  lcd.setCursor(0,1);
-  lcd.print("Weather Monitor");
-  delay(5000);
-  lcd.clear();
-  
- 
-  
-
-   lcd.print("Temp: ");
-     lcd.print(f);
-     lcd.print("F  ");
-     lcd.print(t);
-     lcd.print("C");
-     
-  lcd.setCursor(0,1);
-  lcd.print("Humidity: ");
-  lcd.print(h);
-  lcd.print("%");
-    delay(5000);
-    lcd.clear();
-    
-  lcd.setCursor(0,0);
-  if ((f) >= 85 && (h) >= 51)  {
-    lcd.print("Hot and humid...");
-    lcd.setCursor(0,1);
-    lcd.print("Drink water.");
-  }
-  else if ((f) <= 85 && (f) >= 64 && (h) <= 51) {
-    lcd.print("Perfect!");
-    lcd.setCursor(0,1);
-    lcd.print("Warm and dry.");
-  }
-  
-  else if ((f) <= 85 && (f) >= 64 && (h) >= 51) {
-    lcd.print("Warm and moist,");
-    lcd.setCursor(0,1);
-    lcd.print("Sounds yummy.");
-  }
-  else if ((f) >= 50 && (f) <= 64  && (h) >= 51) {
-    lcd.print("Cool and damp...");
-    lcd.setCursor(0,1);
-    lcd.print("Raincoat?");
-  }
-  
-  else if ((f) >= 50 && (f) <= 64 && (h) <= 51) {
-    lcd.print("Cool and dry.");
-    lcd.setCursor(0,1);
-    lcd.print("Wear a sweater.");
-  }
-  else if ((f) >= 33 && (f) <= 50 && (h) <= 51) {
-    lcd.print("Cool and dry,");
-    lcd.setCursor(0,1);
-    lcd.print("On the brisk side.");
-  }
-  else if ((f) >= 33 && (f) <= 50 && (h) >= 51) {
-    lcd.print("Raw weather...");
-    lcd.setCursor(0,1);
-    lcd.print("Read a book.");
-  }
-  
-  else if ((f) >= 17 && (f) <= 33 && (h) <= 51) {
-    lcd.print("Ah, winter cold");
-    lcd.setCursor(0,1);
-    lcd.print("Dress in layers.");
-  }
-  else if ((f) < 17 ) {
-    lcd.print("OK, now it's");
-    lcd.setCursor(0,1);
-    lcd.print("REALLY cold!");
-  }
- 
-  else {
-    lcd.print("Alert: alien");
-    lcd.setCursor(0,1);
-    lcd.print("atmosphere!");
-  }
-  delay(5000);
-  lcd.clear();
+void send_a_character(unsigned char character)
+{
+    PORTB = character;
+    PORTD |= 1<<registerselection;
+    PORTD |= 1<<enable;
+    _delay_ms(20);
+    PORTD &= ~1<<enable;
+    PORTB = 0;
+}
+void send_a_string(char *string_of_characters)
+{
+    while(*string_of_characters > 0)
+    {
+        send_a_character(*string_of_characters++);
+    }
 }
